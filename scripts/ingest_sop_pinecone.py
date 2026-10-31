@@ -43,7 +43,7 @@ if HASH_CACHE_FILE.exists():
 # ==========================================
 # 2. DYNAMIC ENVIRONMENT ROUTING
 # ==========================================
-EMBEDDINGS_MODEL_SETTING = os.getenv("Embeddings_model", "LOCAL").strip().upper()
+EMBEDDINGS_MODEL_SETTING = "LOCAL"
 
 if EMBEDDINGS_MODEL_SETTING == "OPENAI":
     print("🤖 Mode: Utilizing Cloud OpenAI Embeddings (1536 Dim)...")
