@@ -7,7 +7,7 @@ import pandas as pd
 import pypdf  
 
 from pinecone import Pinecone, ServerlessSpec
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
@@ -27,29 +27,16 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 if not PINECONE_API_KEY:
     raise ValueError("Missing PINECONE_API_KEY in .env")
 
-# Set up clean production data cache path
-cache_dir = project_root / "data" / "cache"
-cache_dir.mkdir(parents=True, exist_ok=True)
-HASH_CACHE_FILE = cache_dir / "ingestion_hash_cache.json"
-
-hash_cache = {}
-if HASH_CACHE_FILE.exists():
-    try:
-        with open(HASH_CACHE_FILE, "r") as f:
-            hash_cache = json.load(f)
-    except Exception:
-        hash_cache = {}
-
 # ==========================================
 # 2. DYNAMIC ENVIRONMENT ROUTING
 # ==========================================
-EMBEDDINGS_MODEL_SETTING = "LOCAL"
+EMBEDDINGS_MODEL_SETTING = "GEMINI"
 
-if EMBEDDINGS_MODEL_SETTING == "OPENAI":
+if EMBEDDINGS_MODEL_SETTING == "GEMINI":
     print("🤖 Mode: Utilizing Cloud OpenAI Embeddings (1536 Dim)...")
-    embeddings = OpenAIEmbeddings()
-    INDEX_NAME = "fde-sop-index-openai"  # Isolated OpenAI Index
+    INDEX_NAME = "fde-sop-index-gemini"  # Isolated OpenAI Index
     TARGET_DIMENSION = 1536
+    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001" , output_dimensionality=TARGET_DIMENSION)
 else:
     # Read the explicit model identifier casing string from the .env parameters
     local_model_target = os.getenv("Local_Embedding_Model", "BAAI/bge-m3").strip()
@@ -154,6 +141,19 @@ def parse_and_chunk_document(doc_path: Path) -> list[Document]:
             valid_chunks.append(chunk)
             
     return valid_chunks
+
+# Set up clean production data cache path
+cache_dir = project_root / "data" / "cache"
+cache_dir.mkdir(parents=True, exist_ok=True)
+HASH_CACHE_FILE = cache_dir / f"ingestion_hash_cache_{INDEX_NAME}.json"
+
+hash_cache = {}
+if HASH_CACHE_FILE.exists():
+    try:
+        with open(HASH_CACHE_FILE, "r") as f:
+            hash_cache = json.load(f)
+    except Exception:
+        hash_cache = {}
 
 # ==========================================
 # 5. INCREMENTAL PIPELINE WITH BATCHING
