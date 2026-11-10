@@ -2,13 +2,13 @@ import os
 import sys
 import uuid
 import json
-import urllib
+import urllib.parse
 from pathlib import Path
 from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
 # ==========================================
 # 1. IMMEDIATE PATH & ENVIRONMENT RESOLUTION
@@ -22,7 +22,10 @@ if str(project_root) not in sys.path:
 load_dotenv(project_root / ".env")
 
 # Import the compiled graph and tools list dynamically
-from src.agent import fde_agent
+from src.agent import fde_agent, load_system_prompt
+from src.voice import GnaniVoiceClient, GnaniVoiceError, SUPPORTED_LANGUAGES
+from src.voice.brief import split_voice_brief, fallback_brief
+from src.voice.driver_alerts import build_driver_alert, ALERT_LANGUAGES
 
 # ==========================================
 # 2. SQL CREDENTIALS MAPPING FROM .ENV
@@ -91,7 +94,19 @@ if "thread_id" not in st.session_state:
 if "ui_messages" not in st.session_state:
     st.session_state.ui_messages = []
 
+if "primed" not in st.session_state:
+    st.session_state.primed = False      # has this thread received the system prompt yet?
+if "last_audio_key" not in st.session_state:
+    st.session_state.last_audio_key = None
+
 thread_config = {"configurable": {"thread_id": st.session_state.thread_id}}
+
+
+@st.cache_resource(show_spinner=False)
+def get_voice_client() -> GnaniVoiceClient:
+    return GnaniVoiceClient()
+
+voice = get_voice_client()
 
 # ==========================================
 # 5. SIDEBAR NAVIGATION & METADATA
@@ -101,6 +116,16 @@ with st.sidebar:
     st.title("FDE Command Center")
     
     app_mode = st.radio("System Mode", ["🧊 Dispatch Console", "🛡️ Security & Audit Logs"])
+
+    st.markdown("---")
+    st.markdown("**🎙️ Voice (Gnani Vachana)**")
+    if voice.configured:
+        st.caption(f"STT `{voice.stt_model}` · TTS `{voice.tts_model}`")
+    else:
+        st.warning("Set `GNANI_API_KEY` in `.env` to enable voice.", icon="🔑")
+    lang_options = {"indic-auto": "Auto-detect language", **SUPPORTED_LANGUAGES}
+    speak_lang = st.selectbox("Speaking language", list(lang_options), format_func=lang_options.get, key="speak_lang")
+    speak_replies = st.toggle("🔊 Speak the reply", value=True, key="speak_replies", disabled=not voice.configured)
     
     st.markdown("---")
     st.caption(f"Session Token: `{st.session_state.thread_id[:8]}...`")
@@ -135,20 +160,57 @@ if app_mode == "🧊 Dispatch Console":
                         with st.expander(f"📤 View Raw Output ({trace['name']})", expanded=False):
                             st.code(trace["content"], language="text")
             st.markdown(entry["content"])
+            if entry.get("audio"):
+                st.audio(entry["audio"], format="audio/wav")
 
-    if user_input := st.chat_input("Query fleet telemetry, corridor updates, or compliance thresholds..."):
-        
-        st.session_state.ui_messages.append({"role": "user", "content": user_input})
+    # ---- Voice input (Gnani Prisma STT) -------------------------------------------------
+    voice_text, voice_lang = "", None
+    with st.expander("🎙️ Ask by voice — speak in English, Hindi, Tamil, Telugu, Kannada and more", expanded=False):
+        recording = st.audio_input("Record a question (max 30 seconds)", key="mic")
+        if recording is not None:
+            audio_bytes = recording.getvalue()
+            audio_key = hash(audio_bytes)
+            if audio_key != st.session_state.last_audio_key:       # don't re-run on every Streamlit rerun
+                st.session_state.last_audio_key = audio_key
+                if not voice.configured:
+                    st.error("Voice needs GNANI_API_KEY in your .env file.")
+                else:
+                    try:
+                        with st.spinner("Transcribing with Gnani Prisma..."):
+                            result = voice.transcribe(
+                                audio_bytes,
+                                language_code=st.session_state.speak_lang,
+                                keyterms=["reefer", "cold chain", "SOP", "telemetry", "breach", "vaccine", "dispatch"],
+                            )
+                        if result.text:
+                            voice_text, voice_lang = result.text, result.language_code
+                        else:
+                            st.warning("I couldn't hear any speech. Please try again closer to the mic.")
+                    except GnaniVoiceError as err:
+                        st.error(f"🎙️ {err}")
+
+    typed_input = st.chat_input("Query fleet telemetry, corridor updates, or compliance thresholds...")
+    user_input = typed_input or voice_text
+    reply_lang = voice_lang if voice_text else None
+
+    if user_input:
+
+        shown = f"🎙️ _({SUPPORTED_LANGUAGES.get(voice_lang, voice_lang)})_ {user_input}" if voice_text else user_input
+        st.session_state.ui_messages.append({"role": "user", "content": shown})
         with st.chat_message("user", avatar="👤"):
-            st.markdown(user_input)
+            st.markdown(shown)
 
         with st.chat_message("assistant", avatar="🤖"):
             final_response = ""
             current_traces = [] 
             
             with st.status("🧠 Initializing Core Reasoner Node...", expanded=True) as status:
+                payload_msgs = [HumanMessage(content=user_input)]
+                if not st.session_state.primed:   # the dispatcher prompt was previously never sent from the UI
+                    payload_msgs.insert(0, SystemMessage(content=load_system_prompt()))
+                    st.session_state.primed = True
                 events = fde_agent.stream(
-                    {"messages": [HumanMessage(content=user_input)]}, 
+                    {"messages": payload_msgs}, 
                     config=thread_config,
                     stream_mode="updates"
                 )
@@ -215,11 +277,24 @@ if app_mode == "🧊 Dispatch Console":
                 status.update(label="Incident Matrix Evaluation Complete", state="complete", expanded=False)
                 
             if final_response:
-                st.markdown(final_response)
+                visible, brief = split_voice_brief(final_response)
+                st.markdown(visible)
+                reply_audio = None
+                if st.session_state.speak_replies and voice.configured:
+                    try:
+                        spoken = brief or fallback_brief(visible)
+                        tts_lang = reply_lang if reply_lang in SUPPORTED_LANGUAGES else (
+                            st.session_state.speak_lang if st.session_state.speak_lang in SUPPORTED_LANGUAGES else "auto")
+                        with st.spinner("Synthesizing speech with Gnani Timbre..."):
+                            reply_audio = voice.synthesize(spoken, language=tts_lang)
+                        st.audio(reply_audio, format="audio/wav", autoplay=bool(voice_text))
+                    except GnaniVoiceError as err:
+                        st.caption(f"🔇 Voice reply unavailable: {err}")
                 st.session_state.ui_messages.append({
                     "role": "assistant",
-                    "content": final_response,
-                    "traces": current_traces
+                    "content": visible,
+                    "traces": current_traces,
+                    "audio": reply_audio,
                 })
             else:
                 error_fallback = "⚠️ Execution Timeout: System engine encountered an unresolved processing edge case."
@@ -228,7 +303,7 @@ if app_mode == "🧊 Dispatch Console":
 
 elif app_mode == "🛡️ Security & Audit Logs":
     # ------------------------------------------
-    # TAB 2: AUDIT LOG VIEWER (REQUIRES ADMIN CREDENTIALS FROM .ENV OR INPUT)
+    # TAB 3: AUDIT LOG VIEWER (REQUIRES ADMIN CREDENTIALS FROM .ENV OR INPUT)
     # ------------------------------------------
     st.title("🛡️ Enterprise Agent Audit Trail")
     st.caption("Secure database inspection of FDE_VIEWS.AgentAuditLog")

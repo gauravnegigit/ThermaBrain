@@ -130,21 +130,21 @@ def query_telemetry_db(sql_query: str) -> str:
     except Exception as e:
         return f"Database Error: {str(e)}"
 
-@tool
-def scan_fleet_for_breaches(cargo: str = "", min_severity: str = "Warning", top: int = 5) -> str:
-    """
-    Proactively scans EVERY shipment in the fleet telemetry and returns a ranked list of
-    cold-chain breaches with the SOP-required action for each. Use this first for broad
-    questions such as "what needs my attention?", "any critical breaches?" or "summarise fleet risk".
-    Args: cargo = optional filter (Vaccines, Dairy, Fresh Produce, Frozen Food);
-    min_severity = "Warning" or "Critical"; top = how many incidents to return (max 10).
-    """
-    try:
-        fleet = watchtower.load_fleet()
-        incidents = watchtower.scan_fleet(fleet, min_severity=min_severity, cargo=cargo or None)
-        return watchtower.format_incidents_for_agent(incidents, watchtower.fleet_summary(fleet), top=max(1, min(int(top), 10)))
-    except Exception as e:
-        return f"Watchtower Error: {str(e)}"
+# @tool
+# def scan_fleet_for_breaches(cargo: str = "", min_severity: str = "Warning", top: int = 5) -> str:
+#     """
+#     Proactively scans EVERY shipment in the fleet telemetry and returns a ranked list of
+#     cold-chain breaches with the SOP-required action for each. Use this first for broad
+#     questions such as "what needs my attention?", "any critical breaches?" or "summarise fleet risk".
+#     Args: cargo = optional filter (Vaccines, Dairy, Fresh Produce, Frozen Food);
+#     min_severity = "Warning" or "Critical"; top = how many incidents to return (max 10).
+#     """
+#     try:
+#         fleet = watchtower.load_fleet()
+#         incidents = watchtower.scan_fleet(fleet, min_severity=min_severity, cargo=cargo or None)
+#         return watchtower.format_incidents_for_agent(incidents, watchtower.fleet_summary(fleet), top=max(1, min(int(top), 10)))
+#     except Exception as e:
+#         return f"Watchtower Error: {str(e)}"
 
 @tool
 def fetch_corridor_conditions(latitude: float, longitude: float) -> str:
