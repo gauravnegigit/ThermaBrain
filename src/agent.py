@@ -35,7 +35,7 @@ AGENT_LLM_SETTING = os.getenv("Agent_llm", "OLLAMA").strip().upper()
 if AGENT_LLM_SETTING == "GEMINI":
     print("🤖 Brain Mode: Utilizing Cloud OpenAI Reasoner (gpt-4o)...")
     from langchain_google_genai import ChatGoogleGenerativeAI
-    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0)
 
 elif AGENT_LLM_SETTING == "DEEPSEEK":
     print("🐳 Brain Mode: Utilizing Flagship DeepSeek Cloud Reasoner (deepseek-v4-pro)...")
@@ -80,6 +80,26 @@ graph.add_edge("tools", "reasoner")
 
 fde_agent = graph.compile(checkpointer=MemorySaver())
 
+def content_to_text(content) -> str:
+    """LLM replies are a str for some providers and a list of content blocks for others (e.g. Gemini)."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        return str(content.get("text", ""))
+    if isinstance(content, (list, tuple)):
+        return "".join(content_to_text(part) for part in content)
+    return str(content)
+
+def load_system_prompt() -> str:
+    """Single source of truth for the dispatcher prompt (used by the CLI loop AND the Streamlit app)."""
+    prompt_path = project_root / "src" / "prompts" / "system_prompt.txt"
+    try:
+        return prompt_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return "You are a helpful AI assistant."
+
 # ==========================================
 # 4. CHAT LOOP TESTING PANEL
 # ==========================================
@@ -89,14 +109,7 @@ if __name__ == "__main__":
     print(f"   Configured Execution: [LLM: {AGENT_LLM_SETTING}] -> [Embeddings: {os.getenv('Embeddings_model', 'LOCAL')}]")
     print("="*55 + "\n")
     
-    # Load the business-structured system prompt from the external file
-    prompt_path = project_root / "src" / "prompts" / "system_prompt.txt"
-    try:
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_instructions = f.read()
-    except FileNotFoundError:
-        print(f"Error: Could not find {prompt_path}")
-        system_instructions = "You are a helpful AI assistant." # Basic fallback
+    system_instructions = load_system_prompt()
 
     system_prompt = SystemMessage(content=system_instructions)
     

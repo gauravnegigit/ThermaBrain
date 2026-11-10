@@ -22,7 +22,7 @@ if str(project_root) not in sys.path:
 load_dotenv(project_root / ".env")
 
 # Import the compiled graph and tools list dynamically
-from src.agent import fde_agent, load_system_prompt
+from src.agent import fde_agent, load_system_prompt , content_to_text
 from src.voice import GnaniVoiceClient, GnaniVoiceError, SUPPORTED_LANGUAGES
 from src.voice.brief import split_voice_brief, fallback_brief
 from src.voice.driver_alerts import build_driver_alert, ALERT_LANGUAGES
@@ -244,7 +244,7 @@ if app_mode == "🧊 Dispatch Console":
                             
                             # B. Intercept Final Generation
                             if latest_msg.content:
-                                final_response = latest_msg.content
+                                final_response = content_to_text(latest_msg.content)
                                 status.update(label="📝 Generating Operational Resolution Report...")
                                 
                                 write_audit_log(

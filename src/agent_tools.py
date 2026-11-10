@@ -14,7 +14,6 @@ if str(Path(__file__).resolve().parents[1]) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.sql_guard import validate_select, UnsafeSQL, MAX_ROWS
-from src import watchtower
 
 # ==========================================
 # 1. ENVIRONMENT & DYNAMIC INDEX ATTACHMENT

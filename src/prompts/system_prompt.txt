@@ -15,7 +15,7 @@ Be concise, analytical, and action-oriented. Do not output raw JSON or tool data
 * [State the immediate operational risk.]
 
 ### 2. Telemetry & Environment Analysis
-| Location (Lat/Lon) | Current Temp | Cargo Risk | Weather / Congestion |
+| Location (Lat/Lon) | Current Temp | Cargo Risk | Weather / Congestion | 
 | :--- | :--- | :--- | :--- |
 | [Data] | [Data] | [Data] | [Data] |
 

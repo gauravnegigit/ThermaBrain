@@ -41,33 +41,25 @@ legacy_mapping = {
     'excursion_severity': 'EXCURSION_SEV_TXT',
 
     # Risk classification
-    'risk_level': 'RISK_CLS_TXT',
+    'risk_level': 'RISK_CLS_LEV',
 
     # Delivery and delay
     'delay_minutes': 'DELAY_MIN',
-    'Planned_ETA': 'PLANNED_ETA_TS',
-    'actual_eta': 'ACTUAL_ETA_TS',
 
     # Route and vehicle information
     'Origin_Location': 'ORG_LOC_TXT',
     'Destination_Location': 'DEST_LOC_TXT',
     'TRANSPORTATION_DISTANCE_IN_KM': 'ROUTE_DIST_KM',
-    'vehicle_type': 'VEH_TYPE_TXT',
 
     # Cargo information
     'product_type': 'CARGO_TYPE_TXT',
-    'delivery_status': 'DELIVERY_STATUS_TXT',
 
     # Identifiers
-    'trip_id': 'TRIP_ID',
-    'BookingID': 'BOOKING_ID',
     'vehicle_no': 'VEH_ID'
 }
 
 df_legacy = df[list(legacy_mapping.keys())].rename(columns=legacy_mapping)
 
-# Add a fake ingestion flag to make it look like an automated legacy system
-df_legacy['SYS_INGEST_FLAG'] = 'Y'
 print(df_legacy.shape)
 
 # 3. Connect to Docker MSSQL Server
@@ -90,6 +82,6 @@ engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
 # 4. Ingest data into the messy table name
 table_name = 'TBL_SC_FLEET_HIST_RAW'
 print(f"Ingesting into {table_name}. This may take a minute...")
-df.to_sql(table_name, engine, if_exists='replace', index=False, schema='dbo')
+df_legacy.to_sql(table_name, engine, if_exists='replace', index=False, schema='dbo')
 
 print("✅ Legacy data ingestion complete!")
