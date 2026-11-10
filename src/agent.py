@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     system_prompt = SystemMessage(content=system_instructions)
     
-    thread_config = {"configurable": {"thread_id": "production_test_1"}}
+    thread_config = {"configurable": {"thread_id": "test_1"}}
     is_first = True
     
     while True:
