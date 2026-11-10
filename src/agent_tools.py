@@ -1,5 +1,6 @@
 import os
-import urllib
+import sys
+import urllib.parse
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
@@ -8,6 +9,12 @@ from sqlalchemy import create_engine, text
 from langchain_core.tools import tool
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
+
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.sql_guard import validate_select, UnsafeSQL, MAX_ROWS
+from src import watchtower
 
 # ==========================================
 # 1. ENVIRONMENT & DYNAMIC INDEX ATTACHMENT
@@ -82,9 +89,10 @@ def query_telemetry_db(sql_query: str) -> str:
     """
     Executes a SQL SELECT query against the FDE_VIEWS.VW_ACTIVE_FLEET view.
     Columns available:
-    Timestamp, Latitude, Longitude, Current_Temperature_C, Cargo_Condition_Code,
-    Risk_Classification, Delay_Probability, Port_Congestion_Level, Route_Risk_Index.
-    Always write standard T-SQL queries.
+    Trip_ID, Vehicle_ID, Cargo_Type, Timestamp, Latitude, Longitude, Current_Temperature_C,
+    Min_Safe_Temp_C, Max_Safe_Temp_C, Cargo_Condition_Code, Excursion_Severity,
+    Risk_Classification, Delay_Minutes.
+    Always write a single standard T-SQL SELECT that reads from FDE_VIEWS.VW_ACTIVE_FLEET (max 10 rows returned).
     """
     connection_string = (
             f"DRIVER={{ODBC Driver 18 for SQL Server}};"
@@ -101,13 +109,15 @@ def query_telemetry_db(sql_query: str) -> str:
     engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
     
     try:
-        if not sql_query.strip().upper().startswith("SELECT"):
-            return "SECURITY BLOCK: Only SELECT operations are authorized on this view."
-            
+        try:
+            safe_sql = validate_select(sql_query)
+        except UnsafeSQL as blocked:
+            return f"SECURITY BLOCK: {blocked}"
+
         with engine.connect() as conn:
-            cursor = conn.execute(text(sql_query))
+            cursor = conn.execute(text(safe_sql))
             columns = list(cursor.keys())
-            rows = cursor.fetchmany(10)
+            rows = cursor.fetchmany(MAX_ROWS)
             
             if not rows:
                 return "No records matched the query criteria."
@@ -119,6 +129,22 @@ def query_telemetry_db(sql_query: str) -> str:
             return formatted_output
     except Exception as e:
         return f"Database Error: {str(e)}"
+
+@tool
+def scan_fleet_for_breaches(cargo: str = "", min_severity: str = "Warning", top: int = 5) -> str:
+    """
+    Proactively scans EVERY shipment in the fleet telemetry and returns a ranked list of
+    cold-chain breaches with the SOP-required action for each. Use this first for broad
+    questions such as "what needs my attention?", "any critical breaches?" or "summarise fleet risk".
+    Args: cargo = optional filter (Vaccines, Dairy, Fresh Produce, Frozen Food);
+    min_severity = "Warning" or "Critical"; top = how many incidents to return (max 10).
+    """
+    try:
+        fleet = watchtower.load_fleet()
+        incidents = watchtower.scan_fleet(fleet, min_severity=min_severity, cargo=cargo or None)
+        return watchtower.format_incidents_for_agent(incidents, watchtower.fleet_summary(fleet), top=max(1, min(int(top), 10)))
+    except Exception as e:
+        return f"Watchtower Error: {str(e)}"
 
 @tool
 def fetch_corridor_conditions(latitude: float, longitude: float) -> str:
