@@ -19,7 +19,7 @@ project_root = script_dir.parents[0]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from src.agent_tools import query_telemetry_db, fetch_corridor_conditions, search_compliance_sop
+from src.agent_tools import query_telemetry_db, query_driver_telemetry, fetch_corridor_conditions, search_compliance_sop
 
 load_dotenv(project_root / ".env")
 
@@ -80,6 +80,22 @@ graph.add_edge("tools", "reasoner")
 
 fde_agent = graph.compile(checkpointer=MemorySaver())
 
+# Driver graph deliberately excludes the unrestricted fleet SQL tool.
+driver_tools = [fetch_corridor_conditions, search_compliance_sop]
+driver_llm_with_tools = llm.bind_tools(driver_tools)
+
+def driver_reasoning_node(state: AgentState):
+    response = driver_llm_with_tools.invoke(state["messages"])
+    return {"messages": [response]}
+
+driver_graph = StateGraph(AgentState)
+driver_graph.add_node("reasoner", driver_reasoning_node)
+driver_graph.add_node("tools", ToolNode(driver_tools))
+driver_graph.add_edge(START, "reasoner")
+driver_graph.add_conditional_edges("reasoner", tools_condition)
+driver_graph.add_edge("tools", "reasoner")
+driver_agent = driver_graph.compile(checkpointer=MemorySaver())
+
 def content_to_text(content) -> str:
     """LLM replies are a str for some providers and a list of content blocks for others (e.g. Gemini)."""
     if content is None:
@@ -92,9 +108,10 @@ def content_to_text(content) -> str:
         return "".join(content_to_text(part) for part in content)
     return str(content)
 
-def load_system_prompt() -> str:
-    """Single source of truth for the dispatcher prompt (used by the CLI loop AND the Streamlit app)."""
-    prompt_path = project_root / "src" / "prompts" / "system_prompt.txt"
+def load_system_prompt(role: str = "manager") -> str:
+    """Load the role-specific instructions for the shared operational agent."""
+    filename = "driver_prompt.txt" if role == "driver" else "system_prompt.txt"
+    prompt_path = project_root / "src" / "prompts" / filename
     try:
         return prompt_path.read_text(encoding="utf-8")
     except FileNotFoundError:

@@ -22,7 +22,7 @@ if str(project_root) not in sys.path:
 load_dotenv(project_root / ".env")
 
 # Import the compiled graph and tools list dynamically
-from src.agent import fde_agent, load_system_prompt , content_to_text
+from src.agent import fde_agent, driver_agent, load_system_prompt , content_to_text
 from src.voice import GnaniVoiceClient, GnaniVoiceError, SUPPORTED_LANGUAGES
 from src.voice.brief import split_voice_brief, fallback_brief
 from src.voice.driver_alerts import build_driver_alert, ALERT_LANGUAGES
@@ -86,20 +86,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. MULTI-USER STATE & THREAD MANAGEMENT
+# 4. ROLE-SPECIFIC SESSION & THREAD MANAGEMENT
 # ==========================================
-if "thread_id" not in st.session_state:
-    st.session_state.thread_id = str(uuid.uuid4())
-
-if "ui_messages" not in st.session_state:
-    st.session_state.ui_messages = []
-
-if "primed" not in st.session_state:
-    st.session_state.primed = False      # has this thread received the system prompt yet?
-if "last_audio_key" not in st.session_state:
-    st.session_state.last_audio_key = None
-
-thread_config = {"configurable": {"thread_id": st.session_state.thread_id}}
+# Each role gets its own LangGraph thread and chat history.
+if "role_sessions" not in st.session_state:
+    st.session_state.role_sessions = {}
 
 
 @st.cache_resource(show_spinner=False)
@@ -109,16 +100,22 @@ def get_voice_client() -> GnaniVoiceClient:
 voice = get_voice_client()
 
 # ==========================================
-# 5. SIDEBAR NAVIGATION & METADATA
+# 5. ROLE SELECTION & SHARED SETTINGS
 # ==========================================
 with st.sidebar:
     st.image(str(script_dir / "image_L25X5q.png") if (script_dir / "image_L25X5q.png").exists() else "https://cdn-icons-png.flaticon.com/512/2830/2830305.png", width=65)
-    st.title("FDE Command Center")
-    
-    app_mode = st.radio("System Mode", ["🧊 Dispatch Console", "🛡️ Security & Audit Logs"])
+    st.title("ThermaBrain")
+    selected_view = st.radio(
+        "Choose your workspace",
+        ["Fleet / Logistics Manager", "Truck Driver", "Security & Audit Logs"],
+        key="selected_view",
+    )
+    app_mode = "🛡️ Security & Audit Logs" if selected_view == "Security & Audit Logs" else "🧊 Dispatch Console"
+    role = "driver" if selected_view == "Truck Driver" else "manager"
+    role_key = role
 
     st.markdown("---")
-    st.markdown("**🎙️ Voice (Gnani Vachana)**")
+    st.markdown("**🎙️ Gnani Voice**")
     if voice.configured:
         st.caption(f"STT `{voice.stt_model}` · TTS `{voice.tts_model}`")
     else:
@@ -126,16 +123,24 @@ with st.sidebar:
     lang_options = {"indic-auto": "Auto-detect language", **SUPPORTED_LANGUAGES}
     speak_lang = st.selectbox("Speaking language", list(lang_options), format_func=lang_options.get, key="speak_lang")
     speak_replies = st.toggle("🔊 Speak the reply", value=True, key="speak_replies", disabled=not voice.configured)
-    
+
+    if app_mode == "🧊 Dispatch Console":
+        session = st.session_state.role_sessions.setdefault(role_key, {})
+        session.setdefault("thread_id", str(uuid.uuid4()))
+        session.setdefault("ui_messages", [])
+        session.setdefault("primed", False)
+        session.setdefault("last_audio_key", None)
+        thread_id = session["thread_id"]
+        ui_messages = session["ui_messages"]
+        thread_config = {"configurable": {"thread_id": thread_id}}
+        st.markdown("---")
+        st.caption(f"{selected_view} session: `{thread_id[:8]}...`")
+        if st.button("🗑️ Clear this chat", use_container_width=True):
+            session.update({"thread_id": str(uuid.uuid4()), "ui_messages": [], "primed": False, "last_audio_key": None})
+            st.rerun()
+
     st.markdown("---")
-    st.caption(f"Session Token: `{st.session_state.thread_id[:8]}...`")
-    st.markdown(f"**Reasoning Architecture:** `{os.getenv('Agent_llm', 'DEEPSEEK')}`")
-    
-    st.markdown("---")
-    if st.button("🗑️ Purge Dispatch Workspace Session", use_container_width=True):
-        st.session_state.ui_messages = []
-        st.session_state.thread_id = str(uuid.uuid4())
-        st.rerun()
+    st.caption(f"Reasoning model: `{os.getenv('Agent_llm', 'DEEPSEEK')}`")
 
 # ==========================================
 # 6. VIEW ROUTING (DISPATCH VS AUDIT)
@@ -145,12 +150,18 @@ if app_mode == "🧊 Dispatch Console":
     # ------------------------------------------
     # TAB 1: CHAT UI & AGENT EXECUTION
     # ------------------------------------------
-    st.title("Cold-Chain Incident Control Dashboard")
-    st.caption("Production Data Engineering Pipeline • Real-Time Decision Optimization Platform")
+    if role == "manager":
+        st.title("Fleet Operations Intelligence")
+        st.caption("Investigate fleet-wide cold-chain risks, telemetry, route disruptions and SOP compliance.")
+    else:
+        st.title("Driver Assist")
+        st.caption("Report a problem, ask what to do next, or speak in your preferred language.")
+        st.info("The driver assistant can look up only the vehicle ID entered here. Stop safely before using the app.", icon="🚚")
+        driver_vehicle_id = st.text_input("Your vehicle ID", key="driver_vehicle_id", placeholder="e.g. TRK-1042")
 
-    for entry in st.session_state.ui_messages:
+    for entry in ui_messages:
         with st.chat_message(entry["role"], avatar="👤" if entry["role"] == "user" else "🤖"):
-            if "traces" in entry:
+            if role == "manager" and "traces" in entry:
                 for trace in entry["traces"]:
                     if trace["type"] == "tool_input":
                         st.markdown(f"**⚡ Intent Recognized:** `{trace['name']}`")
@@ -165,13 +176,13 @@ if app_mode == "🧊 Dispatch Console":
 
     # ---- Voice input (Gnani Prisma STT) -------------------------------------------------
     voice_text, voice_lang = "", None
-    with st.expander("🎙️ Ask by voice — speak in English, Hindi, Tamil, Telugu, Kannada and more", expanded=False):
-        recording = st.audio_input("Record a question (max 30 seconds)", key="mic")
+    with st.expander("🎙️ Speak to the assistant", expanded=(role == "driver")):
+        recording = st.audio_input("Record your question", key=f"mic_{role}")
         if recording is not None:
             audio_bytes = recording.getvalue()
             audio_key = hash(audio_bytes)
-            if audio_key != st.session_state.last_audio_key:       # don't re-run on every Streamlit rerun
-                st.session_state.last_audio_key = audio_key
+            if audio_key != session["last_audio_key"]:       # don't re-run on every Streamlit rerun
+                session["last_audio_key"] = audio_key
                 if not voice.configured:
                     st.error("Voice needs GNANI_API_KEY in your .env file.")
                 else:
@@ -189,27 +200,34 @@ if app_mode == "🧊 Dispatch Console":
                     except GnaniVoiceError as err:
                         st.error(f"🎙️ {err}")
 
-    typed_input = st.chat_input("Query fleet telemetry, corridor updates, or compliance thresholds...")
+    typed_input = st.chat_input("Ask about your shipment, temperature, or next action..." if role == "driver" else "Ask about fleet telemetry, incidents, routes, or compliance...")
     user_input = typed_input or voice_text
+    if role == "driver" and user_input:
+        if not st.session_state.get("driver_vehicle_id", "").strip():
+            st.warning("Enter your vehicle ID before sending a question.")
+            user_input = ""
+        else:
+            user_input = f"My vehicle ID is {st.session_state.driver_vehicle_id.strip()}. Driver question: {user_input}"
     reply_lang = voice_lang if voice_text else None
 
     if user_input:
 
         shown = f"🎙️ _({SUPPORTED_LANGUAGES.get(voice_lang, voice_lang)})_ {user_input}" if voice_text else user_input
-        st.session_state.ui_messages.append({"role": "user", "content": shown})
+        ui_messages.append({"role": "user", "content": shown})
         with st.chat_message("user", avatar="👤"):
             st.markdown(shown)
 
-        with st.chat_message("assistant", avatar="🤖"):
+        with st.chat_message("assistant", avatar="🧊" if role == "manager" else "🚚"):
             final_response = ""
             current_traces = [] 
             
-            with st.status("🧠 Initializing Core Reasoner Node...", expanded=True) as status:
+            with st.status("Checking your request..." if role == "driver" else "🧠 Initializing Core Reasoner Node...", expanded=(role == "manager")) as status:
                 payload_msgs = [HumanMessage(content=user_input)]
-                if not st.session_state.primed:   # the dispatcher prompt was previously never sent from the UI
-                    payload_msgs.insert(0, SystemMessage(content=load_system_prompt()))
-                    st.session_state.primed = True
-                events = fde_agent.stream(
+                if not session["primed"]:   # the dispatcher prompt was previously never sent from the UI
+                    payload_msgs.insert(0, SystemMessage(content=load_system_prompt(role)))
+                    session["primed"] = True
+                active_agent = driver_agent if role == "driver" else fde_agent
+                events = active_agent.stream(
                     {"messages": payload_msgs}, 
                     config=thread_config,
                     stream_mode="updates"
@@ -223,11 +241,12 @@ if app_mode == "🧊 Dispatch Console":
                             
                             # A. Intercept Tool Call Requests (Inputs)
                             if hasattr(latest_msg, "tool_calls") and latest_msg.tool_calls:
-                                status.update(label="🧠 Agent generated tool parameters...")
+                                status.update(label="Checking operational data..." if role == "driver" else "🧠 Agent generated tool parameters...")
                                 for tool_call in latest_msg.tool_calls:
-                                    st.markdown(f"**⚡ Intent Recognized:** `{tool_call['name']}`")
-                                    with st.expander(f"📥 View Generated Input ({tool_call['name']})", expanded=False):
-                                        st.json(tool_call['args'])
+                                    if role == "manager":
+                                        st.markdown(f"**⚡ Intent Recognized:** `{tool_call['name']}`")
+                                        with st.expander(f"📥 View Generated Input ({tool_call['name']})", expanded=False):
+                                            st.json(tool_call['args'])
                                     
                                     current_traces.append({
                                         "type": "tool_input",
@@ -236,7 +255,7 @@ if app_mode == "🧊 Dispatch Console":
                                     })
                                     
                                     write_audit_log(
-                                        session_id=st.session_state.thread_id,
+                                        session_id=thread_id,
                                         node_name="reasoner",
                                         tool_name=tool_call['name'],
                                         content=json.dumps(tool_call['args'])
@@ -245,21 +264,22 @@ if app_mode == "🧊 Dispatch Console":
                             # B. Intercept Final Generation
                             if latest_msg.content:
                                 final_response = content_to_text(latest_msg.content)
-                                status.update(label="📝 Generating Operational Resolution Report...")
+                                status.update(label="Preparing your instructions..." if role == "driver" else "📝 Generating Operational Resolution Report...")
                                 
                                 write_audit_log(
-                                    session_id=st.session_state.thread_id,
+                                    session_id=thread_id,
                                     node_name="reasoner_final",
                                     tool_name="LLM Text Synthesis",
                                     content=final_response
                                 )
                                 
                         elif node_name == "tools":
-                            status.update(label="🔧 Executing Enterprise Subsystem Tools...")
+                            status.update(label="Retrieving trip and safety information..." if role == "driver" else "🔧 Executing Enterprise Subsystem Tools...")
                             for msg in node_state.get("messages", []):
                                 if isinstance(msg, ToolMessage):
-                                    with st.expander(f"📤 View Raw Output ({msg.name})", expanded=False):
-                                        st.code(msg.content, language="text")
+                                    if role == "manager":
+                                        with st.expander(f"📤 View Raw Output ({msg.name})", expanded=False):
+                                            st.code(msg.content, language="text")
                                         
                                     current_traces.append({
                                         "type": "tool_output",
@@ -268,17 +288,19 @@ if app_mode == "🧊 Dispatch Console":
                                     })
                                     
                                     write_audit_log(
-                                        session_id=st.session_state.thread_id,
+                                        session_id=thread_id,
                                         node_name="tools",
                                         tool_name=msg.name,
                                         content=msg.content
                                     )
                 
-                status.update(label="Incident Matrix Evaluation Complete", state="complete", expanded=False)
+                status.update(label="Ready" if role == "driver" else "Incident Matrix Evaluation Complete", state="complete", expanded=False)
                 
             if final_response:
                 visible, brief = split_voice_brief(final_response)
                 st.markdown(visible)
+                if role == "driver":
+                    st.caption("If there is an immediate safety risk, stop safely and contact your dispatcher. Do not use the chatbot while driving.")
                 reply_audio = None
                 if st.session_state.speak_replies and voice.configured:
                     try:
@@ -290,7 +312,7 @@ if app_mode == "🧊 Dispatch Console":
                         st.audio(reply_audio, format="audio/wav", autoplay=bool(voice_text))
                     except GnaniVoiceError as err:
                         st.caption(f"🔇 Voice reply unavailable: {err}")
-                st.session_state.ui_messages.append({
+                ui_messages.append({
                     "role": "assistant",
                     "content": visible,
                     "traces": current_traces,

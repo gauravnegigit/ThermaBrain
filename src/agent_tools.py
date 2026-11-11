@@ -129,6 +129,41 @@ def query_telemetry_db(sql_query: str) -> str:
     except Exception as e:
         return f"Database Error: {str(e)}"
 
+@tool
+def query_driver_telemetry(vehicle_id: str) -> str:
+    """Return the latest telemetry for one exact vehicle ID supplied by the driver.
+    This driver-facing tool is intentionally fixed-query and cannot retrieve fleet-wide rows.
+    """
+    vehicle_id = (vehicle_id or "").strip()
+    if not vehicle_id or len(vehicle_id) > 80:
+        return "A valid vehicle ID is required."
+
+    connection_string = (
+        f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+        f"SERVER={db_host},{db_port};DATABASE=master;"
+        f"UID={db_user};PWD={db_password};Encrypt=no;TrustServerCertificate=yes;"
+    )
+    params = urllib.parse.quote_plus(connection_string)
+    engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
+    query = text("""
+        SELECT TOP 10 Trip_ID, Vehicle_ID, Cargo_Type, Timestamp, Latitude, Longitude,
+               Current_Temperature_C, Min_Safe_Temp_C, Max_Safe_Temp_C,
+               Cargo_Condition_Code, Excursion_Severity, Risk_Classification, Delay_Minutes
+        FROM FDE_VIEWS.VW_ACTIVE_FLEET
+        WHERE Vehicle_ID = :vehicle_id
+        ORDER BY Timestamp DESC
+    """)
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"vehicle_id": vehicle_id})
+            rows = result.fetchall()
+            if not rows:
+                return f"No active telemetry found for vehicle ID {vehicle_id}. Verify the ID with dispatch."
+            return "COLUMNS: " + ", ".join(result.keys()) + "\n" + "\n".join(str(tuple(row)) for row in rows)
+    except Exception as exc:
+        return f"Driver telemetry lookup failed: {exc}"
+
+
 # @tool
 # def scan_fleet_for_breaches(cargo: str = "", min_severity: str = "Warning", top: int = 5) -> str:
 #     """
