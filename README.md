@@ -1,5 +1,7 @@
 # ThermaBrain
 
+### ThermaBrain is live on https://thermabrain.onrender.com
+
 ThermaBrain is a cold-chain logistics assistant with separate workspaces for **Fleet / Logistics Managers** and **Truck Drivers**. It combines SQL-based shipment telemetry, SOP retrieval, an LLM agent workflow, and optional Gnani speech input/output in a Streamlit application.
 
 ## What the application includes
