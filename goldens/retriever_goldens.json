@@ -1,0 +1,183 @@
+
+[
+  {
+    "id": "eval_001",
+    "query": "What temperature should fresh perishable cargo maintain during transportation?",
+    "ideal_answer": "Fresh perishables must maintain an IoT temperature between 0.0°C and 4.0°C.",
+    "source": "Cold_chain_sop.md-chunk-1"
+  },
+  {
+    "id": "eval_002",
+    "query": "My truck's IoT temperature sensor is showing 5.2°C. What does the SOP require me to do?",
+    "ideal_answer": "A temperature exceeding 4.0°C is an immediate cold-chain breach. The dispatcher must immediately contact the driver to restart the auxiliary cooling unit.",
+    "source": "Cold_chain_sop.md-chunk-1"
+  },
+  {
+    "id": "eval_003",
+    "query": "If my refrigerated truck has a temperature breach and the ETA is delayed by 90 minutes, what should happen?",
+    "ideal_answer": "The dispatcher must immediately contact the driver to restart the auxiliary cooling unit. Since the ETA delay is greater than one hour, the vehicle must be diverted to the nearest emergency cold-storage facility.",
+    "source": "Cold_chain_sop.md-chunk-1"
+  },
+  {
+    "id": "eval_004",
+    "query": "At what port congestion severity should standard routing be suspended, and where should shipments be diverted?",
+    "ideal_answer": "If the port congestion severity index at the Port of Long Beach / LA exceeds 7.0, standard routing must be suspended. Active shipments should be diverted to the Inland Empire Overflow Depot in San Bernardino for cross-docking. Freight should not be held at the port.",
+    "source": "Cold_chain_sop.md-chunk-2"
+  },
+  {
+    "id": "eval_005",
+    "query": "A shipment is classified as High Risk and has a delay probability of 0.72. Who needs to be informed?",
+    "ideal_answer": "The shipment must be escalated to the Tier 2 Logistics Manager because it is classified as High Risk and its delay probability exceeds 0.65.",
+    "source": "Cold_chain_sop.md-chunk-3"
+  },
+  {
+    "id": "eval_006",
+    "query": "Does a High Risk shipment with a delay probability of exactly 0.65 require Tier 2 escalation?",
+    "ideal_answer": "The SOP requires escalation when the shipment is High Risk and its delay probability is greater than 0.65. A value of exactly 0.65 does not satisfy the stated greater-than condition.",
+    "source": "Cold_chain_sop.md-chunk-3"
+  },
+  {
+    "id": "eval_007",
+    "query": "What is the maximum temperature allowed for refrigerated high-risk food storage?",
+    "ideal_answer": "The target storage temperature is 4°C (39°F). The temperature must not exceed 8°C (46°F). Raw fish and meat must not exceed 4°C (39°F).",
+    "source": "Cargo.pdf-chunk-28"
+  },
+  {
+    "id": "eval_008",
+    "query": "Our refrigerator temperature has crossed 8°C. What corrective action does the food safety standard prescribe?",
+    "ideal_answer": "First check whether there is a technical error and check the food temperature. If food temperature exceeds 5°C (41°F), check food quality. If there is a technical error, transfer the food to another refrigerator; otherwise, check whether the temperature is coming down.",
+    "source": "Cargo.pdf-chunk-28; Cargo.pdf-chunk-29"
+  },
+  {
+    "id": "eval_009",
+    "query": "How frequently should refrigeration temperatures be monitored, and what information must be recorded?",
+    "ideal_answer": "Refrigeration temperatures must be monitored at least twice per day. Records must specify the date and time of the recorded temperature.",
+    "source": "Cargo.pdf-chunk-29"
+  },
+  {
+    "id": "eval_010",
+    "query": "What temperature should chilled potentially hazardous meals have when leaving dispatch?",
+    "ideal_answer": "Food temperature must not exceed 4°C (40°F) at dispatch, or a lower temperature if required by law or the customer.",
+    "source": "Cargo.pdf-chunk-43"
+  },
+  {
+    "id": "eval_011",
+    "query": "What is the maximum permitted temperature for chilled meals when loaded onto an aircraft?",
+    "ideal_answer": "Chilled meals must have a maximum temperature of 8°C (46°F) at the time of loading on board.",
+    "source": "Cargo.pdf-chunk-43"
+  },
+  {
+    "id": "eval_012",
+    "query": "What should the dispatch team do if food temperature exceeds the critical limit during transportation to the airport?",
+    "ideal_answer": "Restore the food under refrigeration or add dry ice and report the deviation to the responsible manager. If food temperature exceeds 8°C (46°F) at aircraft loading, report the deviation to the responsible manager and add dry ice.",
+    "source": "Cargo.pdf-chunk-44"
+  },
+  {
+    "id": "eval_013",
+    "query": "How long can food remain outside refrigeration while being transported to the airport?",
+    "ideal_answer": "The time during which food is removed from refrigeration during transport to the airport must not exceed three hours.",
+    "source": "Cargo.pdf-chunk-44"
+  },
+  {
+    "id": "eval_014",
+    "query": "What temperature should refrigerated food have when received from a supplier?",
+    "ideal_answer": "Purchased refrigerated foods must be at 5°C (41°F) or less at receiving. Fish on ice, minced meat, and prepared raw meat must not exceed 4°C (39°F).",
+    "source": "Cargo.pdf-chunk-25"
+  },
+  {
+    "id": "eval_015",
+    "query": "What checks must be performed when receiving a food delivery from a supplier?",
+    "ideal_answer": "Verify refrigerated product temperature, the surface of frozen products, weight and size, packaging, labelling, organoleptic condition, and the cleanliness and temperature of the transport vehicle.",
+    "source": "Cargo.pdf-chunk-69"
+  },
+  {
+    "id": "eval_016",
+    "query": "What are the acceptable temperatures inside a supplier truck for chilled, frozen, and ambient deliveries?",
+    "ideal_answer": "The supplier truck's internal temperature must not exceed 10°C for cooled products, -15°C for frozen products, and 18°C for ambient deliveries. If these temperatures are higher, check the food temperature and follow CCP 1.",
+    "source": "Cargo.pdf-chunk-71"
+  },
+  {
+    "id": "eval_017",
+    "query": "How should frozen food be transported and received according to the receiving control procedure?",
+    "ideal_answer": "Purchased frozen foods must be hard frozen and show no signs of previous thawing at receiving. The surface of frozen products must also be checked during receiving.",
+    "source": "Cargo.pdf-chunk-25; Cargo.pdf-chunk-69"
+  },
+  {
+    "id": "eval_018",
+    "query": "What is the maximum temperature permitted during thawing of frozen ready-to-eat food?",
+    "ideal_answer": "Food temperature must not exceed 8°C (46°F) during the thawing process.",
+    "source": "Cargo.pdf-chunk-30"
+  },
+  {
+    "id": "eval_019",
+    "query": "A batch of ready-to-eat frozen food reached 9°C during thawing. Can we continue using it?",
+    "ideal_answer": "No. If food temperature exceeds 8°C (46°F), the food must be discarded.",
+    "source": "Cargo.pdf-chunk-31"
+  },
+  {
+    "id": "eval_020",
+    "query": "How long can thawed ready-to-eat food be stored, and what happens if that limit is exceeded?",
+    "ideal_answer": "Thawed products must be used within 72 hours based on the start of thawing. If thawed food is stored longer than 72 hours, it must be discarded.",
+    "source": "Cargo.pdf-chunk-30; Cargo.pdf-chunk-31"
+  },
+  {
+    "id": "eval_021",
+    "query": "What is the maximum storage temperature for frozen food in freezer units?",
+    "ideal_answer": "All freezer units must be maintained below -18°C (0°F).",
+    "source": "Cargo.pdf-chunk-72"
+  },
+  {
+    "id": "eval_022",
+    "query": "Can we keep homemade frozen food indefinitely if the freezer maintains -18°C?",
+    "ideal_answer": "No. In-house frozen foods must be kept at -18°C (0°F) for a maximum of three months.",
+    "source": "Cargo.pdf-chunk-82"
+  },
+  {
+    "id": "eval_023",
+    "query": "What should happen to expired food items that are discovered during storage or dispatch?",
+    "ideal_answer": "Outdated food items must be discarded and not served to customers. If they are not discarded immediately, they must be clearly segregated from other foods and labelled 'do not use' or 'to be discarded'.",
+    "source": "Cargo.pdf-chunk-82"
+  },
+  {
+    "id": "eval_024",
+    "query": "What is the maximum exposure time for chilled high-risk ready-to-eat food when the ambient temperature is above 21°C?",
+    "ideal_answer": "Exposure to ambient temperature must not exceed 45 minutes. The food temperature must also not exceed 15°C (59°F) during handling.",
+    "source": "Cargo.pdf-chunk-39"
+  },
+  {
+    "id": "eval_025",
+    "query": "How often must ambient room temperature be recorded during food handling?",
+    "ideal_answer": "Room or ambient temperature must be recorded twice daily.",
+    "source": "Cargo.pdf-chunk-40"
+  },
+  {
+    "id": "eval_026",
+    "query": "What maximum transportation temperatures does the ATP Agreement specify for different food categories?",
+    "ideal_answer": "The specified maximum temperatures are 7°C for meats, 6°C for meat products and butter, 4°C for poultry, milk and dairy products, 3°C for offal, and 2°C for fish.",
+    "source": "Temperature.pdf-chunk-12"
+  },
+  {
+    "id": "eval_027",
+    "query": "What is the recommended temperature for commercial frozen storage, and how long can different frozen food categories be stored?",
+    "ideal_answer": "Commercial freezer stores should operate at -18°C (0°F) or below. Practical storage lives range from 12–18 months for fruit and vegetables to approximately six months for fish, shellfish and ice cream.",
+    "source": "Temperature.pdf-chunk-80"
+  },
+  {
+    "id": "eval_028",
+    "query": "A frozen shipment has signs of thawing, including ice inside the packaging and liquid dripping. How should we investigate its temperature history?",
+    "ideal_answer": "Inspect air temperature recorders and thermometers to establish the product's temperature history. Visually inspect the product for signs of thawing, including drip loss, ice inside the package and soiled packaging. A non-destructive investigation can also be performed by measuring the temperature between adjacent packages or boxes.",
+    "source": "Temperature.pdf-chunk-56"
+  },
+  {
+    "id": "eval_029",
+    "query": "Why must refrigerated trucks be pre-cooled before loading, and should the truck stop between temperature-controlled storage areas?",
+    "ideal_answer": "Prior cooling of the distribution vehicle is necessary to achieve the appropriate temperature throughout distribution. Chilled or frozen products should be transferred continuously between temperature-controlled areas without stopping or delays.",
+    "source": "Temperature.pdf-chunk-29; Temperature.pdf-chunk-10"
+  },
+  {
+    "id": "eval_030",
+    "query": "A fleet manager notices that a shipment is High Risk, has a delay probability of 0.70, and its IoT temperature has reached 4.5°C. What actions are required under the available SOPs?",
+    "ideal_answer": "The temperature of 4.5°C exceeds the 4.0°C limit and constitutes an immediate cold-chain breach. The dispatcher must immediately contact the driver to restart the auxiliary cooling unit. Separately, because the shipment is High Risk and its delay probability exceeds 0.65, it must be escalated to the Tier 2 Logistics Manager.",
+    "source": "Cold_chain_sop.md-chunk-1; Cold_chain_sop.md-chunk-3"
+  }
+]
